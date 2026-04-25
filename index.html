@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Duck Hunt Hand Edition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="game-shell">
+    <header class="hud hidden" id="hud">
+      <div class="hud-center">
+        <div class="hud-item">SCORE <span id="scoreValue">0</span></div>
+        <div class="hud-item">HIT <span id="hitValue">0</span></div>
+        <div class="hud-item">MISSES <span id="missValue">0</span></div>
+        <div class="hud-item">TIME <span id="timeValue">60</span></div>
+        <div class="hud-item">ROUND <span id="roundValue">1</span></div>
+        <div class="hud-item">WAVE <span id="waveValue">1</span></div>
+      </div>
+      <div class="hud-controls">
+        <button id="hudWebcamToggle" class="music-toggle" type="button">WEBCAM: ON</button>
+        <button id="hudMusicToggle" class="music-toggle" type="button">MUSIC: OFF</button>
+      </div>
+    </header>
+
+    <main class="stage-wrap">
+      <canvas id="gameCanvas" aria-label="Duck Hunt game canvas"></canvas>
+
+      <aside class="mission-panel hidden" id="missionPanel">
+        <h3>Daily Missions</h3>
+        <ul id="missionList"></ul>
+      </aside>
+
+      <div class="dog-popup hidden" id="dogPopup">
+        <div class="dog-art" aria-hidden="true">
+          <div class="dog-ear left"></div>
+          <div class="dog-ear right"></div>
+          <div class="dog-face">
+            <div class="dog-eye left"></div>
+            <div class="dog-eye right"></div>
+            <div class="dog-nose"></div>
+            <div class="dog-mouth"></div>
+          </div>
+        </div>
+        <p class="dog-text">HAHAHAHA!</p>
+      </div>
+
+      <div class="status-tip hidden" id="statusTip">Allow webcam, then show your hand to play.</div>
+
+      <aside class="tutorial-hint hidden" id="tutorialHint">
+        <h3 id="tutorialTitle">Tutorial</h3>
+        <p id="tutorialText">Follow the steps to learn controls.</p>
+        <div class="tutorial-progress" id="tutorialProgress">Step 1 / 5</div>
+      </aside>
+
+      <section class="pause-overlay hidden" id="pauseOverlay">
+        <div class="panel pause-panel">
+          <h2>Paused</h2>
+          <p class="small-note">Pinch and hold for 1s to pause/resume, or use buttons.</p>
+          <div class="menu-actions">
+            <button id="resumeBtn" class="primary-btn" type="button">RESUME</button>
+            <button id="pauseMenuBtn" class="primary-btn" type="button">MAIN MENU</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <section class="overlay" id="menuScreen">
+      <div class="menu-bg-layer cloud-a"></div>
+      <div class="menu-bg-layer cloud-b"></div>
+      <div class="menu-bg-layer bird-line"></div>
+      <div class="panel menu-panel" id="mainMenuPanel">
+        <h1 class="logo-title">Duck Hunt Hand Edition</h1>
+        <p class="subtitle">Studio-grade webcam arcade hunting</p>
+        <div class="menu-btns">
+          <button id="startBtn" class="primary-btn menu-btn" type="button">START HUNT</button>
+          <button id="tutorialBtn" class="primary-btn menu-btn" type="button">TUTORIAL</button>
+          <button id="handSetupBtn" class="primary-btn menu-btn" type="button">HAND SETUP</button>
+          <button id="settingsBtn" class="primary-btn menu-btn" type="button">SETTINGS</button>
+          <button id="creditsBtn" class="primary-btn menu-btn" type="button">CREDITS</button>
+        </div>
+        <p class="small-note" id="permissionNote">Camera starts when you launch gameplay, tutorial, or setup.</p>
+      </div>
+
+      <div class="panel sub-panel hidden" id="setupPanel">
+        <h2>Hand Setup & Calibration</h2>
+        <div class="setup-grid">
+          <div class="setup-column">
+            <label>Detection Confidence</label>
+            <div class="meter"><span id="confidenceMeterFill"></span></div>
+            <p class="small-note" id="confidenceText">0%</p>
+
+            <label for="sensitivitySlider">Sensitivity</label>
+            <input id="sensitivitySlider" type="range" min="0.6" max="1.6" step="0.05" value="1" />
+
+            <label for="smoothnessSlider">Smoothness</label>
+            <input id="smoothnessSlider" type="range" min="0.15" max="0.9" step="0.05" value="0.4" />
+
+            <label class="check-row"><input id="mirrorToggle" type="checkbox" checked /> Mirror Aim</label>
+          </div>
+
+          <div class="setup-column">
+            <p class="small-note" id="fingerPreview">Index: -- , --</p>
+            <p class="small-note" id="crosshairPreview">Crosshair: -- , --</p>
+            <p class="small-note" id="pinchPreview">Pinch: Not detected</p>
+            <button id="testPinchBtn" class="primary-btn" type="button">TEST PINCH SOUND</button>
+          </div>
+        </div>
+        <div class="menu-actions">
+          <button id="setupBackBtn" class="primary-btn" type="button">BACK</button>
+          <button id="setupPlayBtn" class="primary-btn" type="button">START HUNT</button>
+        </div>
+      </div>
+
+      <div class="panel sub-panel hidden" id="settingsPanel">
+        <h2>Settings</h2>
+        <div class="settings-grid">
+          <label class="check-row"><input id="settingMusic" type="checkbox" /> Music ON</label>
+          <label class="check-row"><input id="settingSfx" type="checkbox" checked /> Sound FX ON</label>
+          <label class="check-row"><input id="settingWebcam" type="checkbox" checked /> Webcam ON</label>
+
+          <label class="check-row"><input id="settingDwellSelect" type="checkbox" checked /> Dwell Select Menu</label>
+          <label class="check-row"><input id="settingPerformance" type="checkbox" /> Performance Mode</label>
+
+          <label for="gestureProfile">Gesture Profile</label>
+          <select id="gestureProfile">
+            <option value="auto" selected>Auto (Pinch + Finger Gun)</option>
+            <option value="pinch">Pinch Only</option>
+            <option value="gun">Finger Gun Only</option>
+          </select>
+
+          <label for="difficultySelect">Difficulty</label>
+          <select id="difficultySelect">
+            <option value="easy">Easy</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Hard</option>
+          </select>
+
+          <label for="multiplayerMode">Multiplayer Mode</label>
+          <select id="multiplayerMode">
+            <option value="solo" selected>Solo</option>
+            <option value="local-versus">Local Versus (2 Players)</option>
+            <option value="online">Online Multiplayer</option>
+          </select>
+
+          <label for="playerOneName">Player 1 Name</label>
+          <input id="playerOneName" type="text" value="Player 1" maxlength="16" />
+
+          <label for="playerTwoName">Player 2 Name</label>
+          <input id="playerTwoName" type="text" value="Player 2" maxlength="16" />
+
+          <label for="accessibilityPreset">Accessibility Preset</label>
+          <select id="accessibilityPreset">
+            <option value="default" selected>Default</option>
+            <option value="deuteranopia">Colorblind Friendly</option>
+            <option value="high-contrast">High Contrast</option>
+          </select>
+
+          <label class="check-row"><input id="settingLargeUi" type="checkbox" /> Larger UI</label>
+          <label class="check-row"><input id="settingSeatedMode" type="checkbox" /> One-hand Seated Mode</label>
+
+          <label for="crosshairSize">Crosshair Size</label>
+          <input id="crosshairSize" type="range" min="14" max="34" step="1" value="20" />
+
+          <button id="fullscreenBtn" class="primary-btn" type="button">TOGGLE FULLSCREEN</button>
+        </div>
+        <div class="menu-actions">
+          <button id="settingsBackBtn" class="primary-btn" type="button">BACK</button>
+        </div>
+      </div>
+
+      <div class="panel sub-panel hidden" id="creditsPanel">
+        <h2>Credits</h2>
+        <p class="small-note">Duck Hunt Hand Edition</p>
+        <p class="small-note">Design + Gameplay: Duck Studio Team</p>
+        <p class="small-note">Hand Tracking: MediaPipe Hands</p>
+        <p class="small-note">Built with HTML5 Canvas + Vanilla JavaScript</p>
+        <div class="menu-actions">
+          <button id="creditsBackBtn" class="primary-btn" type="button">BACK</button>
+        </div>
+      </div>
+
+      <div id="menuHandCursor" class="menu-hand-cursor hidden" aria-hidden="true">
+        <span class="dwell-ring"></span>
+      </div>
+    </section>
+
+    <section class="overlay hidden" id="endScreen">
+      <div class="panel">
+        <h2>Hunt Results</h2>
+        <p class="final-score">Final Score: <span id="finalScore">0</span></p>
+        <p class="small-note">Accuracy: <span id="accuracyValue">0%</span></p>
+        <p class="small-note">Ducks Hit: <span id="ducksHitValue">0</span></p>
+        <p class="small-note">Misses: <span id="resultMissValue">0</span></p>
+        <p class="small-note">Best Combo: <span id="bestComboValue">0</span></p>
+        <p class="small-note">XP Gained: <span id="xpGainedValue">0</span></p>
+        <p class="small-note">Hunter Rank: <span id="rankValue">1</span></p>
+        <p class="small-note">Badges: <span id="badgesValue">-</span></p>
+
+        <h3>Replay Highlights</h3>
+        <ul class="result-list" id="replayList"></ul>
+
+        <h3>Leaderboard</h3>
+        <p class="small-note">Signed Payload: <span id="signedStatus">Pending</span></p>
+        <ul class="result-list" id="leaderboardList"></ul>
+        <div class="menu-actions">
+          <button id="submitScoreBtn" class="primary-btn" type="button">SUBMIT SCORE</button>
+        </div>
+
+        <p class="small-note" id="versusResultText"></p>
+        <div class="menu-actions">
+          <button id="restartBtn" class="primary-btn" type="button">RETRY</button>
+          <button id="backToMenuBtn" class="primary-btn" type="button">MAIN MENU</button>
+        </div>
+      </div>
+    </section>
+
+    <video id="webcam" playsinline muted></video>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
