@@ -22,6 +22,7 @@ const screens = {
 
 const panels = {
   main: document.getElementById("mainMenuPanel"),
+  missions: document.getElementById("missionsPanel"),
   setup: document.getElementById("setupPanel"),
   settings: document.getElementById("settingsPanel"),
   credits: document.getElementById("creditsPanel"),
@@ -31,10 +32,12 @@ const menuControls = {
   startBtn: document.getElementById("startBtn"),
   tutorialBtn: document.getElementById("tutorialBtn"),
   handSetupBtn: document.getElementById("handSetupBtn"),
+  missionsBtn: document.getElementById("missionsBtn"),
   settingsBtn: document.getElementById("settingsBtn"),
   creditsBtn: document.getElementById("creditsBtn"),
   setupBackBtn: document.getElementById("setupBackBtn"),
   setupPlayBtn: document.getElementById("setupPlayBtn"),
+  missionsBackBtn: document.getElementById("missionsBackBtn"),
   settingsBackBtn: document.getElementById("settingsBackBtn"),
   creditsBackBtn: document.getElementById("creditsBackBtn"),
   permissionNote: document.getElementById("permissionNote"),
@@ -60,6 +63,9 @@ const settingsControls = {
   performance: document.getElementById("settingPerformance"),
   gestureProfile: document.getElementById("gestureProfile"),
   difficulty: document.getElementById("difficultySelect"),
+  timerMode: document.getElementById("timerMode"),
+  customTimerSeconds: document.getElementById("customTimerSeconds"),
+  customTimerRow: document.getElementById("customTimerRow"),
   multiplayerMode: document.getElementById("multiplayerMode"),
   playerOneName: document.getElementById("playerOneName"),
   playerTwoName: document.getElementById("playerTwoName"),
@@ -76,6 +82,8 @@ const resultUI = {
   ducksHit: document.getElementById("ducksHitValue"),
   misses: document.getElementById("resultMissValue"),
   bestCombo: document.getElementById("bestComboValue"),
+  timeUsed: document.getElementById("timeUsedValue"),
+  wavesCleared: document.getElementById("wavesClearedValue"),
   xpGained: document.getElementById("xpGainedValue"),
   rank: document.getElementById("rankValue"),
   badges: document.getElementById("badgesValue"),
@@ -94,7 +102,12 @@ const tutorialUI = {
   progress: document.getElementById("tutorialProgress"),
 };
 
-const missionPanel = document.getElementById("missionPanel");
+const missionUI = {
+  summaryText: document.getElementById("missionSummaryText"),
+  progressFill: document.getElementById("missionProgressFill"),
+};
+
+const missionPanel = document.getElementById("missionsPanel");
 const missionList = document.getElementById("missionList");
 const pauseOverlay = document.getElementById("pauseOverlay");
 const resumeBtn = document.getElementById("resumeBtn");
@@ -113,6 +126,8 @@ const config = {
   smoothness: 0.4,
   mirror: true,
   difficulty: "normal",
+  timerMode: "difficulty",
+  customTimer: 60,
   crosshairSize: 20,
   musicOn: false,
   sfxOn: true,
@@ -155,6 +170,16 @@ const difficultyStats = {
 };
 
 const weatherTypes = ["clear", "wind", "dusk", "fog"];
+
+const missionCatalog = [
+  { id: "combo3", text: "Land a 3-hit combo", target: 1 },
+  { id: "combo5", text: "Reach a 5-hit combo", target: 1 },
+  { id: "noMissWave", text: "Finish 2 waves without misses", target: 2 },
+  { id: "timedClear", text: "Hit 6 ducks in the first 20 seconds", target: 1 },
+  { id: "bossBreaker", text: "Defeat 1 boss duck", target: 1 },
+  { id: "duckCollector", text: "Hit 20 ducks total", target: 20 },
+  { id: "sharpShooter", text: "Finish a round with 85% accuracy", target: 1 },
+];
 
 const tutorialSteps = [
   { title: "Step 1: Show Hand", text: "Show one clear hand to the webcam.", done: (s) => s.handDetected },
@@ -295,6 +320,27 @@ function todayKey() {
   return `${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`;
 }
 
+function createMissionSet(savedMissions = []) {
+  const byId = new Map(savedMissions.map((mission) => [mission.id, mission]));
+
+  return missionCatalog.map((mission) => {
+    const saved = byId.get(mission.id) || {};
+    const value = clamp(Number(saved.value) || 0, 0, mission.target);
+    return {
+      ...mission,
+      value,
+      done: Boolean(saved.done) || value >= mission.target,
+    };
+  });
+}
+
+function getActiveTimerSeconds() {
+  if (config.timerMode === "custom") {
+    return clamp(Number(config.customTimer) || 60, 15, 300);
+  }
+  return difficultyStats[config.difficulty].timer;
+}
+
 function resizeCanvas() {
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
@@ -344,11 +390,9 @@ function loadProfile() {
 
   if (profile.missionsDateKey !== todayKey()) {
     profile.missionsDateKey = todayKey();
-    profile.missions = [
-      { id: "combo3", text: "Make a 3-hit combo", target: 1, value: 0, done: false },
-      { id: "noMissWave", text: "Finish 2 waves with no misses", target: 2, value: 0, done: false },
-      { id: "timedClear", text: "Hit 6 ducks in first 20 seconds", target: 1, value: 0, done: false },
-    ];
+    profile.missions = createMissionSet();
+  } else {
+    profile.missions = createMissionSet(profile.missions);
   }
 
   state.missions = profile.missions.map((m) => ({ ...m }));
@@ -404,13 +448,24 @@ function computeRank() {
 }
 
 function updateMissionPanel() {
-  const visible = state.appMode === "game" && state.running;
+  const visible = state.appMode === "menu" && !missionPanel.classList.contains("hidden");
   missionPanel.classList.toggle("hidden", !visible);
   missionList.innerHTML = "";
 
+  const doneCount = state.missions.filter((mission) => mission.done).length;
+  const totalCount = state.missions.length || 1;
+  missionUI.summaryText.textContent = `${doneCount} / ${state.missions.length} missions complete`;
+  missionUI.progressFill.style.width = `${Math.round((doneCount / totalCount) * 100)}%`;
+
   for (const mission of state.missions) {
     const li = document.createElement("li");
-    li.textContent = `${mission.text} (${mission.value}/${mission.target})`;
+    li.innerHTML = `
+      <div class="mission-row">
+        <span class="mission-text">${mission.text}</span>
+        <span class="mission-count">${mission.value}/${mission.target}</span>
+      </div>
+      <div class="mission-meter meter"><span style="width: ${Math.round((mission.value / mission.target) * 100)}%"></span></div>
+    `;
     if (mission.done) {
       li.classList.add("done");
     }
@@ -427,6 +482,7 @@ function markMission(id, amount = 1) {
   if (mission.value >= mission.target) {
     mission.done = true;
   }
+  saveProfile();
 }
 
 function awardMissionXP() {
@@ -598,17 +654,18 @@ function clearMenuHandHover() {
 }
 
 function getVisibleMenuButtons() {
-  return Array.from(screens.menu.querySelectorAll("button")).filter((btn) => !btn.disabled && btn.offsetParent !== null);
+  const root = state.paused ? pauseOverlay : screens.menu;
+  return Array.from(root.querySelectorAll("button")).filter((btn) => !btn.disabled && btn.offsetParent !== null);
 }
 
 function handleMenuHandAction() {
-  if (state.appMode === "menu" && state.menuHoverButton) {
+  if ((state.appMode === "menu" || state.paused) && state.menuHoverButton) {
     state.menuHoverButton.click();
   }
 }
 
 function updateMenuHandNavigation() {
-  if (state.appMode !== "menu") {
+  if (state.appMode !== "menu" && !state.paused) {
     clearMenuHandHover();
     menuHandCursor.classList.add("hidden");
     return;
@@ -679,7 +736,7 @@ function setAppMode(mode) {
     screens.results.classList.add("hidden");
     hud.root.classList.remove("hidden");
     hud.statusTip.classList.remove("hidden");
-    updateMissionPanel();
+    missionPanel.classList.add("hidden");
   }
 
   if (mode === "results") {
@@ -694,12 +751,17 @@ function setAppMode(mode) {
 
 function showMenuPanel(name) {
   panels.main.classList.add("hidden");
+  panels.missions.classList.add("hidden");
   panels.setup.classList.add("hidden");
   panels.settings.classList.add("hidden");
   panels.credits.classList.add("hidden");
 
   if (name === "main") {
     panels.main.classList.remove("hidden");
+  }
+  if (name === "missions") {
+    panels.missions.classList.remove("hidden");
+    updateMissionPanel();
   }
   if (name === "setup") {
     panels.setup.classList.remove("hidden");
@@ -755,8 +817,8 @@ function resetRoundState() {
   state.replayEvents = [];
   state.usingMouseShot = false;
 
-  state.timeLeft = diff.timer;
-  state.gameEndTime = performance.now() + diff.timer * 1000;
+  state.timeLeft = getActiveTimerSeconds();
+  state.gameEndTime = performance.now() + state.timeLeft * 1000;
 
   state.missions = profile.missions.map((m) => ({ ...m }));
   dogPopup.classList.add("hidden");
@@ -810,7 +872,7 @@ function finishToMenu(message) {
 }
 
 function addReplayEvent(type, text) {
-  const elapsed = Math.max(0, difficultyStats[config.difficulty].timer - state.timeLeft).toFixed(1);
+  const elapsed = Math.max(0, getActiveTimerSeconds() - state.timeLeft).toFixed(1);
   state.replayEvents.push({ t: elapsed, type, text });
   if (state.replayEvents.length > 20) {
     state.replayEvents.shift();
@@ -851,7 +913,7 @@ function renderLeaderboardList() {
     return;
   }
 
-  leaderboard.slice(0, 8).forEach((entry, idx) => {
+  leaderboard.slice(0, 20).forEach((entry, idx) => {
     const li = document.createElement("li");
     li.textContent = `#${idx + 1} ${entry.player} - ${entry.score} pts (${entry.accuracy}% acc)`;
     resultUI.leaderboardList.appendChild(li);
@@ -885,13 +947,20 @@ function showResults() {
   setAppMode("results");
 
   const accuracy = state.shots > 0 ? Math.round((state.hits / state.shots) * 100) : 0;
+  if (accuracy >= 85) {
+    markMission("sharpShooter", 1);
+  }
   const gainedXp = computeAndApplyProgression(accuracy);
+  const timeUsed = Math.round(getActiveTimerSeconds() - state.timeLeft);
+  const completedMissions = state.missions.filter((mission) => mission.done).length;
 
   resultUI.finalScore.textContent = state.score;
   resultUI.accuracy.textContent = `${accuracy}%`;
   resultUI.ducksHit.textContent = state.hits;
   resultUI.misses.textContent = state.misses;
   resultUI.bestCombo.textContent = state.bestCombo;
+  resultUI.timeUsed.textContent = `${timeUsed}s`;
+  resultUI.wavesCleared.textContent = state.wavesCleared;
   resultUI.xpGained.textContent = gainedXp;
   resultUI.rank.textContent = computeRank();
   resultUI.badges.textContent = profile.badges.slice(-3).join(", ") || "-";
@@ -915,6 +984,7 @@ function showResults() {
   };
   state.lastScorePayload = payload;
   resultUI.signedStatus.textContent = "Pending submit";
+  resultUI.submitScoreBtn.disabled = false;
 
   if (state.multiplayer.mode === "local-versus" && state.gameplayMode === "game") {
     state.multiplayer.roundResults.push({ player: currentPlayerName(), score: state.score, accuracy });
@@ -932,6 +1002,8 @@ function showResults() {
   } else {
     resultUI.versusResultText.textContent = "";
   }
+
+  missionUI.summaryText.textContent = `${completedMissions} / ${state.missions.length} missions complete`;
 }
 
 function getWaveDuckCount() {
@@ -1107,6 +1179,10 @@ function shoot() {
   spawnHitParticles(hitDuck.x, hitDuck.y);
   playHitSound();
   addReplayEvent("hit", hitDuck.isBoss ? "Boss down" : "Duck down");
+  markMission("duckCollector", 1);
+  if (hitDuck.isBoss) {
+    markMission("bossBreaker", 1);
+  }
 
   if (now - state.lastHitTime < 900) {
     state.comboCount += 1;
@@ -1126,11 +1202,15 @@ function shoot() {
     markMission("combo3", 1);
   }
 
+  if (state.comboCount >= 5) {
+    markMission("combo5", 1);
+  }
+
   if (state.gameplayMode === "tutorial" && state.tutorial.step === 3) {
     state.tutorial.practiceHits += 1;
   }
 
-  const elapsed = difficultyStats[config.difficulty].timer - state.timeLeft;
+  const elapsed = getActiveTimerSeconds() - state.timeLeft;
   if (elapsed <= 20 && state.hits >= 6) {
     markMission("timedClear", 1);
   }
@@ -1833,6 +1913,10 @@ async function onSetupClick() {
   menuControls.permissionNote.textContent = "Tune your tracking values and test pinch.";
 }
 
+function syncTimerModeUI() {
+  settingsControls.customTimerRow.classList.toggle("hidden", settingsControls.timerMode.value !== "custom");
+}
+
 function syncSettingsUI() {
   settingsControls.music.checked = config.musicOn;
   settingsControls.sfx.checked = config.sfxOn;
@@ -1841,6 +1925,8 @@ function syncSettingsUI() {
   settingsControls.performance.checked = config.performanceMode;
   settingsControls.gestureProfile.value = config.gestureProfile;
   settingsControls.difficulty.value = config.difficulty;
+  settingsControls.timerMode.value = config.timerMode;
+  settingsControls.customTimerSeconds.value = config.customTimer;
   settingsControls.multiplayerMode.value = config.multiplayerMode;
   settingsControls.playerOneName.value = config.playerOneName;
   settingsControls.playerTwoName.value = config.playerTwoName;
@@ -1854,15 +1940,21 @@ function syncSettingsUI() {
   setupControls.mirrorToggle.checked = config.mirror;
 
   applyAccessibility();
+  syncTimerModeUI();
 }
 
 function attachEvents() {
   menuControls.startBtn.addEventListener("click", onStartGameClick);
   menuControls.tutorialBtn.addEventListener("click", onTutorialClick);
   menuControls.handSetupBtn.addEventListener("click", onSetupClick);
+  menuControls.missionsBtn.addEventListener("click", () => {
+    showMenuPanel("missions");
+    menuControls.permissionNote.textContent = "Track daily missions and completion progress here.";
+  });
 
   menuControls.settingsBtn.addEventListener("click", () => showMenuPanel("settings"));
   menuControls.creditsBtn.addEventListener("click", () => showMenuPanel("credits"));
+  menuControls.missionsBackBtn.addEventListener("click", () => showMenuPanel("main"));
   menuControls.setupBackBtn.addEventListener("click", () => showMenuPanel("main"));
   menuControls.settingsBackBtn.addEventListener("click", () => showMenuPanel("main"));
   menuControls.creditsBackBtn.addEventListener("click", () => showMenuPanel("main"));
@@ -1939,6 +2031,17 @@ function attachEvents() {
 
   settingsControls.difficulty.addEventListener("change", () => {
     config.difficulty = settingsControls.difficulty.value;
+    saveSettings();
+  });
+
+  settingsControls.timerMode.addEventListener("change", () => {
+    config.timerMode = settingsControls.timerMode.value;
+    syncTimerModeUI();
+    saveSettings();
+  });
+
+  settingsControls.customTimerSeconds.addEventListener("change", () => {
+    config.customTimer = Number(settingsControls.customTimerSeconds.value) || 60;
     saveSettings();
   });
 

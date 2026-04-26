@@ -29,11 +29,6 @@
     <main class="stage-wrap">
       <canvas id="gameCanvas" aria-label="Duck Hunt game canvas"></canvas>
 
-      <aside class="mission-panel hidden" id="missionPanel">
-        <h3>Daily Missions</h3>
-        <ul id="missionList"></ul>
-      </aside>
-
       <div class="dog-popup hidden" id="dogPopup">
         <div class="dog-art" aria-hidden="true">
           <div class="dog-ear left"></div>
@@ -80,10 +75,21 @@
           <button id="startBtn" class="primary-btn menu-btn" type="button">START HUNT</button>
           <button id="tutorialBtn" class="primary-btn menu-btn" type="button">TUTORIAL</button>
           <button id="handSetupBtn" class="primary-btn menu-btn" type="button">HAND SETUP</button>
+          <button id="missionsBtn" class="primary-btn menu-btn" type="button">MISSION</button>
           <button id="settingsBtn" class="primary-btn menu-btn" type="button">SETTINGS</button>
           <button id="creditsBtn" class="primary-btn menu-btn" type="button">CREDITS</button>
         </div>
         <p class="small-note" id="permissionNote">Camera starts when you launch gameplay, tutorial, or setup.</p>
+      </div>
+
+      <div class="panel sub-panel hidden" id="missionsPanel">
+        <h2>Mission Log</h2>
+        <p class="small-note" id="missionSummaryText">0 / 0 complete</p>
+        <div class="mission-progress meter"><span id="missionProgressFill"></span></div>
+        <ul class="mission-list" id="missionList"></ul>
+        <div class="menu-actions">
+          <button id="missionsBackBtn" class="primary-btn" type="button">BACK</button>
+        </div>
       </div>
 
       <div class="panel sub-panel hidden" id="setupPanel">
@@ -166,6 +172,17 @@
           <label for="crosshairSize">Crosshair Size</label>
           <input id="crosshairSize" type="range" min="14" max="34" step="1" value="20" />
 
+          <label for="timerMode">Timer</label>
+          <select id="timerMode">
+            <option value="difficulty" selected>Use Difficulty Timer</option>
+            <option value="custom">Custom Timer</option>
+          </select>
+
+          <div id="customTimerRow" class="timer-row hidden">
+            <label for="customTimerSeconds">Custom Timer Seconds</label>
+            <input id="customTimerSeconds" type="number" min="15" max="300" step="5" value="60" />
+          </div>
+
           <button id="fullscreenBtn" class="primary-btn" type="button">TOGGLE FULLSCREEN</button>
         </div>
         <div class="menu-actions">
@@ -184,40 +201,53 @@
         </div>
       </div>
 
-      <div id="menuHandCursor" class="menu-hand-cursor hidden" aria-hidden="true">
-        <span class="dwell-ring"></span>
-      </div>
     </section>
 
     <section class="overlay hidden" id="endScreen">
-      <div class="panel">
+      <div class="panel result-panel">
         <h2>Hunt Results</h2>
-        <p class="final-score">Final Score: <span id="finalScore">0</span></p>
-        <p class="small-note">Accuracy: <span id="accuracyValue">0%</span></p>
-        <p class="small-note">Ducks Hit: <span id="ducksHitValue">0</span></p>
-        <p class="small-note">Misses: <span id="resultMissValue">0</span></p>
-        <p class="small-note">Best Combo: <span id="bestComboValue">0</span></p>
-        <p class="small-note">XP Gained: <span id="xpGainedValue">0</span></p>
-        <p class="small-note">Hunter Rank: <span id="rankValue">1</span></p>
-        <p class="small-note">Badges: <span id="badgesValue">-</span></p>
+        <div class="result-layout">
+          <section class="result-block result-overview">
+            <p class="final-score">Final Score: <span id="finalScore">0</span></p>
+            <div class="result-stats">
+              <div class="result-stat"><span>Accuracy</span><strong id="accuracyValue">0%</strong></div>
+              <div class="result-stat"><span>Ducks Hit</span><strong id="ducksHitValue">0</strong></div>
+              <div class="result-stat"><span>Misses</span><strong id="resultMissValue">0</strong></div>
+              <div class="result-stat"><span>Best Combo</span><strong id="bestComboValue">0</strong></div>
+              <div class="result-stat"><span>Time Used</span><strong id="timeUsedValue">0s</strong></div>
+              <div class="result-stat"><span>Waves Cleared</span><strong id="wavesClearedValue">0</strong></div>
+              <div class="result-stat"><span>XP Gained</span><strong id="xpGainedValue">0</strong></div>
+              <div class="result-stat"><span>Hunter Rank</span><strong id="rankValue">1</strong></div>
+            </div>
+            <p class="small-note">Badges: <span id="badgesValue">-</span></p>
+            <p class="small-note">Signed Payload: <span id="signedStatus">Pending</span></p>
+            <p class="small-note" id="versusResultText"></p>
+          </section>
 
-        <h3>Replay Highlights</h3>
-        <ul class="result-list" id="replayList"></ul>
+          <section class="result-block">
+            <h3>Replay Highlights</h3>
+            <ul class="result-list result-scrollable" id="replayList"></ul>
+            <div class="menu-actions result-actions">
+              <button id="submitScoreBtn" class="primary-btn" type="button">SUBMIT SCORE</button>
+            </div>
+          </section>
 
-        <h3>Leaderboard</h3>
-        <p class="small-note">Signed Payload: <span id="signedStatus">Pending</span></p>
-        <ul class="result-list" id="leaderboardList"></ul>
-        <div class="menu-actions">
-          <button id="submitScoreBtn" class="primary-btn" type="button">SUBMIT SCORE</button>
+          <section class="result-block">
+            <h3>Leaderboard</h3>
+            <ul class="result-list result-scrollable leaderboard-list" id="leaderboardList"></ul>
+          </section>
         </div>
 
-        <p class="small-note" id="versusResultText"></p>
-        <div class="menu-actions">
+        <div class="menu-actions result-actions">
           <button id="restartBtn" class="primary-btn" type="button">RETRY</button>
           <button id="backToMenuBtn" class="primary-btn" type="button">MAIN MENU</button>
         </div>
       </div>
     </section>
+
+    <div id="menuHandCursor" class="menu-hand-cursor hidden" aria-hidden="true">
+      <span class="dwell-ring"></span>
+    </div>
 
     <video id="webcam" playsinline muted></video>
   </div>
